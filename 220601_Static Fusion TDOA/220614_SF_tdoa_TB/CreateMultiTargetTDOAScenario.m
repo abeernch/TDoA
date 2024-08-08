@@ -1,0 +1,71 @@
+function [scenario, tdoaPairs, receiverIDs] = CreateMultiTargetTDOAScenario(simTime,simInterval)
+% This function defines the multi-target scenario that is used to generate
+% detections using the Sensor fusion toolbox. The passive detections will
+% at the sensor network will be utilized to associate data using the Static
+% Fusion Algorithm. This will suppress ghost detections.
+
+
+scenario = trackingScenario('StopTime',simTime);
+scenario.UpdateRate = simInterval;
+
+% Position sensors interactively
+grid on; title('Sensor Network Geometry'); xlabel('Cross-Range (km)'); ylabel('Down-Range (km)')
+axis([-200 200 -200 200])
+[xs,ys] = ginput();
+nSensors = length(xs);
+close;
+
+% The algorithm shown in the example is suitable for 3-D workflows. Each
+% receiver must be at different height to observe/estimate the z of
+% the object. 
+zs = (zeros(1,nSensors)*900+100);
+% zs = ones(1,nSensors)*(200e3);
+
+for i = 1:nSensors
+    p = platform(scenario);
+    p.Trajectory.Position = [xs(i) ys(i) zs(i)].*1e3;
+end
+
+%% Initialize Emitter Location
+% Define the emitter positions interactively, the velocities are randomly
+% initialized as gaussian distributed 
+% assigned
+grid on; title('Initialize Emitter Position'); xlabel('Cross-Range (km)'); ylabel('Down-Range (km)')
+axis([-200 200 -200 200])
+[xe,ye] = ginput();
+nEmitter = length(xe);
+ze = (zeros(1,nEmitter)*900)+100;
+close;
+
+
+vxEmitter = 1*randn(1,nEmitter);
+vyEmitter = 1*randn(1,nEmitter);
+vzEmitter = zeros(1,nEmitter);
+
+for i = 1:nEmitter
+target = platform(scenario);
+target.Trajectory.Position = [xe(i) ye(i) ze(i)].*1e3;
+target.Trajectory.Velocity = [vxEmitter(i) vyEmitter(i) vzEmitter(i)];
+end
+
+% PlatformIDs of TDOA calculation pairs. Each row represents the TDOA pair
+% [1 3] means a TDOA is calculated between 1 and 3 with 3 as the reference
+% receiver.
+tdoaPairs = (1:(nSensors-1))';
+tdoaPairs(:,2) = nSensors;
+
+% IDs of all receivers
+receiverIDs = 1:nSensors;
+
+%% Checks
+if nSensors < 3
+    errordlg('Minimum Number of Sensors must be 3', 'Sensor Network')
+    return
+end
+
+if nEmitter < 1
+    errordlg('Enter At Least One Emitter', 'No Emitter added to scenario')
+    return
+end
+
+end
