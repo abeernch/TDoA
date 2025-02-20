@@ -1,0 +1,110 @@
+%% Least Squares Augmented 2D Hyperbolic Localization using TDoA measurements
+
+% The objective of this test script is to identify and verify the synergy
+% of the polynomial hyperbolic solution obtained from solving the
+% non-linear equations of hyperbola and that of the iterative least squares
+% method such that the final estimate of the emitter location is improved
+% significantly compared to the analytical-only solution.
+
+% Fundamentally, once, based on the TDoA measurements, the emitter location
+% is estimated, it is passed on as an 'initial guess' along with
+% information and model of the noise and sensor geometry. The iterative
+% least squares method then minimizes the (vertical) residual between the
+% estimated RDoA and the measured RDoAs until the tolerance achieved of the
+% solution begins to diverge. 
+% More in logs
+
+% Author: Abeer Nasir Chaudhry®
+% 250129
+
+clc;clear;close all
+
+%% Initialize simulation parameters
+
+% Initialize sensor attributes
+refSen = 1;
+sensorPos = [00e3, 10e3 10e3 -25e3; 
+             00e3  20e3 -20e3, 00e3;
+             00e3   00e3 00e3  00e3 ]; 
+
+nSensor = size(sensorPos,2);
+
+% Central Reference System Pairing
+tdoaPairs(:,2) = (2:(nSensor))';tdoaPairs(:,1) = 1;
+
+% Set the RMS error in time
+timingErr = 100e-9; 
+
+%% Initialize source attributes
+% emitterPos = [10e3;150e3;00];
+y = linspace(0,1e3,10e3);
+x = 2*y.^2 +y/2;
+emitterPos = [x;y];
+
+
+%%
+
+
+nEmitter = size(emitterPos,2);
+
+% Set the seed for the rng
+rng(1,"twister");
+
+%% Initialize the estimator
+tol  = 1; % Desired position error tolerance
+iter = 25;
+%% Initialize the baseline hyperbolic equations as inline functions 
+syms x1 x2 x3 x4 xx y1 y2 y3 y4 yy z1 z2 z3 z4 zz c tdoa12 tdoa13 tdoa14
+eqn1 = sqrt((x1-xx)^2 + (y1-yy)^2 + (z1-zz)^2) - sqrt((x2-xx)^2 + (y2-yy)^2 + (z2-zz)^2)  == c*(tdoa12);
+eqn2 = sqrt((x1-xx)^2 + (y1-yy)^2 + (z1-zz)^2) - sqrt((x3-xx)^2 + (y3-yy)^2 + (z3-zz)^2)  == c*(tdoa13);
+eqn3 = sqrt((x1-xx)^2 + (y1-yy)^2 + (z1-zz)^2) - sqrt((x4-xx)^2 + (y4-yy)^2 + (z4-zz)^2)  == c*(tdoa14);
+
+[x1,y1,z1]       = deal(sensorPos(1,1),sensorPos(2,1),sensorPos(3,1));
+[x2,y2,z2]       = deal(sensorPos(1,2),sensorPos(2,2),sensorPos(3,2));
+[x3,y3,z3]       = deal(sensorPos(1,3),sensorPos(2,3),sensorPos(3,3));
+[x4,y4,z4]       = deal(sensorPos(1,4),sensorPos(2,4),sensorPos(3,4));
+
+c = physconst('Lightspeed');
+ 
+% Solve partial equation and create inline functions
+sol = solve([eval(eqn1) eval(eqn2) eval(eqn3)],[xx yy zz]);
+
+solHyp_x1 = matlabFunction(sol.xx(1));solHyp_x2 = matlabFunction(sol.xx(2));
+solHyp_y1 = matlabFunction(sol.yy(1));solHyp_y2 = matlabFunction(sol.yy(2));
+solHyp_z1 = matlabFunction(sol.zz(1));solHyp_z2 = matlabFunction(sol.zz(2));
+
+for i = 1
+    % ToA/TDoA Generator function. Generate ToA/TDoAs with set std dev and seed
+    % for RNG
+    [reported_tdoa, measRange] = fn_tdoaGen(sensorPos, emitterPos, timingErr, tdoaPairs);
+
+    % Evaluate the referenced hyperbolic equations to get the TDoA
+    % solutions
+    sol_x(1:2,i) = [solHyp_x1(reported_tdoa(1),reported_tdoa(2),reported_tdoa(3)); solHyp_x2(reported_tdoa(1),reported_tdoa(2),reported_tdoa(3))];
+    sol_y(1:2,i) = [solHyp_y1(reported_tdoa(1),reported_tdoa(2),reported_tdoa(3)); solHyp_y2(reported_tdoa(1),reported_tdoa(2),reported_tdoa(3))];
+    pos_est(1:2,i) = [sol_x(2,i).' sol_y(2,i).'];
+
+
+    %% Implementing the OLS method
+    % [xx,pos_est] = deal([-10e3;-10e3]);
+    [error, posPredict] = fn_tdoaOLS(sensorPos, refSen, pos_est, measRange, tol, iter);
+    
+    %% Visualize results
+    figure;hold on;grid on
+    scatter(sensorPos(1,:)/1e3,sensorPos(2,:)/1e3,'o','filled','MarkerEdgeColor','k','DisplayName','Sensor Network')
+    scatter(emitterPos(1)/1e3,emitterPos(2)/1e3,'filled','^','MarkerFaceColor','r','MarkerEdgeColor','k','DisplayName','True Emitter Position')
+    scatter(posPredict(1,end)/1e3,posPredict(2,end)/1e3,'square','MarkerEdgeColor','g','LineWidth',1.5,'DisplayName','Least Squares Solution')
+    scatter(posPredict(1,1:end-1)/1e3,posPredict(2,1:end-1)/1e3,'x','MarkerEdgeColor','k','DisplayName','Least Squares History')
+    scatter(sol_x(1)/1e3,sol_y(1)/1e3,'blue','+','LineWidth',1.5,'DisplayName','Analytical Solution')
+    legend
+    xlabel('Cross-Range (km)');ylabel('Down-Range (km)')
+    
+    figure;
+    plot(1:length(error),error)
+
+end
+%% LOG
+% 1. Date created (updated): 250129 
+
+% 2. This combination allows us to solve the problem of providing a
+% sufficiently viable initial guess to the LSE.
