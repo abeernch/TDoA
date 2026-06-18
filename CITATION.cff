@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+message: "If you use this repository, please cite it as below."
+title: "TDoA / FDoA"
+authors:
+  - family-names: Chaudhry
+    given-names: Abeer Nasir
+repository-code: "https://github.com/abeernch/TDoA"
+license: MIT
