@@ -50,6 +50,17 @@ from the root documentation.
 - `250110_TDoA_Benchmarking/tdoaGDoP_bench_250110.m`
 - `250129_LeastSquares_Custom_TDoA/mainadsb.m`
 
+## Related Paper
+
+For the complementary geometry-quality metric work that matches this codebase,
+cite:
+
+```text
+Abeer Nasir Chaudhry, Salman Liaquat, and Muhammad Mohsin Khadim,
+$\kappa$: A Geometry-Quality Metric Complementary to GDoP for Closed-Form
+TDoA Multilateration, arXiv:2606.14372, 2026.
+```
+
 ## Notes
 
 - The repository contains MATLAB `.m` scripts and a few live scripts (`.mlx`).
